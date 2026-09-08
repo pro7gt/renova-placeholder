@@ -11,10 +11,25 @@ interface RegisterPayload {
   consent: boolean | string;
   subject?: string;
   company?: string;
+  _hp_website?: string;
   'cf-turnstile-response'?: string;
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept',
+};
+
+export const OPTIONS: APIRoute = async () => {
+  return new Response(null, {
+    status: 204,
+    headers: JSON_HEADERS,
+  });
+};
+
+export const POST: APIRoute = async ({ request }) => {
   try {
     const contentType = request.headers.get('content-type') || '';
     let payload: RegisterPayload;
@@ -32,6 +47,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         consent: formData.get('consent') === 'on' || formData.get('consent') === 'true',
         subject: formData.get('subject') ? String(formData.get('subject')) : undefined,
         company: formData.get('company') ? String(formData.get('company')) : undefined,
+        _hp_website: formData.get('_hp_website') ? String(formData.get('_hp_website')) : undefined,
         'cf-turnstile-response': formData.get('cf-turnstile-response')
           ? String(formData.get('cf-turnstile-response'))
           : undefined,
@@ -39,10 +55,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // 1. Honeypot check: silently ignore bots
-    if (payload.company && payload.company.trim() !== '') {
+    const honeypot = (payload._hp_website || payload.company || '').trim();
+    if (honeypot !== '') {
       return new Response(JSON.stringify({ success: true, message: 'Received' }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: JSON_HEADERS,
       });
     }
 
@@ -55,7 +72,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!fullname || !email || !role) {
       return new Response(
         JSON.stringify({ error: 'Please add your name, email and select who you are.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: JSON_HEADERS }
       );
     }
 
@@ -63,18 +80,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!emailRegex.test(email)) {
       return new Response(
         JSON.stringify({ error: 'Please enter a valid email address.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: JSON_HEADERS }
       );
     }
 
     if (!consent) {
       return new Response(
         JSON.stringify({ error: 'Please tick the consent box so we can be in touch.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: JSON_HEADERS }
       );
     }
 
-    // 3. Cloudflare Turnstile token verification (if secret key configured)
+    // 3. Environment retrieval (Cloudflare Workers & Node fallback)
     let env: Record<string, any> = { ...process.env };
     try {
       const cf = await import('cloudflare:workers');
@@ -82,8 +99,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
         env = { ...env, ...cf.env };
       }
     } catch {
-      // Fallback to process.env if cloudflare:workers is unavailable
+      // Fallback to process.env
     }
+
+    // 4. Cloudflare Turnstile verification (if configured)
     const turnstileSecret = env.TURNSTILE_SECRET_KEY;
     const turnstileToken = payload['cf-turnstile-response'];
 
@@ -97,16 +116,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
         }),
       });
 
-      const verifyData = await verifyRes.json() as { success: boolean };
+      const verifyData = (await verifyRes.json()) as { success: boolean };
       if (!verifyData.success) {
         return new Response(
           JSON.stringify({ error: 'Security verification failed. Please try again.' }),
-          { status: 403, headers: { 'Content-Type': 'application/json' } }
+          { status: 403, headers: JSON_HEADERS }
         );
       }
     }
 
-    // 4. Email delivery setup
+    // 5. Email delivery setup
+    const fromEmail = env.FROM_EMAIL || 'Renova TMS <notifications@renovatms.com>';
     const toEmail = env.TO_EMAIL || 'admin@renovatms.com';
     const emailSubject = payload.subject || `Renova TMS interest: ${role}`;
     const emailBody = [
@@ -127,11 +147,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const emailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
+          Authorization: `Bearer ${resendApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Renova TMS <notifications@renovatms.com>',
+          from: fromEmail,
           to: [toEmail],
           subject: emailSubject,
           text: emailBody,
@@ -140,20 +160,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
 
       if (!emailRes.ok) {
-        const errText = await emailRes.text();
+        const errJson = (await emailRes.json().catch(() => null)) as { message?: string } | null;
+        const errText = errJson?.message || (await emailRes.text().catch(() => 'Unknown delivery error'));
         console.error('Resend delivery failed:', errText);
-        // Fallback response with notice
         return new Response(
           JSON.stringify({
-            success: true,
-            warning: 'Notification delivery queued. Admin notified.',
+            error: `Email delivery failed: ${errText}`,
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
+          { status: 502, headers: JSON_HEADERS }
         );
       }
     } else {
       // Preview mode logging
       console.log('--- [PREVIEW MODE FORM SUBMISSION] ---');
+      console.log(`From: ${fromEmail}`);
       console.log(`To: ${toEmail}`);
       console.log(`Subject: ${emailSubject}`);
       console.log(emailBody);
@@ -162,13 +182,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     return new Response(
       JSON.stringify({ success: true, message: 'Details received successfully.' }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      { status: 200, headers: JSON_HEADERS }
     );
   } catch (error: any) {
     console.error('Registration submission error:', error);
     return new Response(
       JSON.stringify({ error: 'Sorry, something went wrong processing your request.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: JSON_HEADERS }
     );
   }
 };

@@ -13,10 +13,10 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
           </p>
         </div>
 
-        <form id="interestForm" novalidate>
-          <!-- Honeypot: hidden from real users, catches automated bots -->
+        <form id="interestForm" action="/api/register" method="POST" novalidate>
+          <!-- Honeypot: hidden from real users, catches automated bots (using non-autofill name) -->
           <div class="hp" aria-hidden="true">
-            <label>Leave this field empty<input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+            <label>Leave this field empty<input type="text" name="_hp_website" tabindex="-1" autocomplete="new-password" /></label>
           </div>
 
           <!-- Hidden subject field updated dynamically from role -->
@@ -145,8 +145,8 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
       errBox.textContent = '';
       clearInvalidStates();
 
-      const companyInput = form.querySelector('input[name="company"]') as HTMLInputElement | null;
-      if (companyInput && companyInput.value) {
+      const hpInput = form.querySelector('input[name="_hp_website"], input[name="company"]') as HTMLInputElement | null;
+      if (hpInput && hpInput.value.trim() !== '') {
         // Honeypot triggered: simulate success to thwart bots
         showSuccess();
         return;
@@ -154,12 +154,19 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
 
       const fullnameInput = form.querySelector('input[name="fullname"]') as HTMLInputElement | null;
       const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement | null;
+      const phoneInput = form.querySelector('input[name="phone"]') as HTMLInputElement | null;
+      const messageInput = form.querySelector('textarea[name="message"]') as HTMLTextAreaElement | null;
       const consentInput = form.querySelector('input[name="consent"]') as HTMLInputElement | null;
+      const turnstileInput = form.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
 
       const fullname = fullnameInput ? fullnameInput.value.trim() : '';
       const email = emailInput ? emailInput.value.trim() : '';
+      const phone = phoneInput ? phoneInput.value.trim() : '';
       const role = roleSel.value;
+      const message = messageInput ? messageInput.value.trim() : '';
       const consent = consentInput ? consentInput.checked : false;
+      const subject = subjectField ? subjectField.value : `Renova TMS interest: ${role}`;
+      const turnstileToken = turnstileInput ? turnstileInput.value : undefined;
 
       if (!fullname) {
         errBox.textContent = 'Please enter your full name.';
@@ -195,22 +202,46 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
       if (btnText) btnText.textContent = 'Sending details...';
 
       try {
-        const formData = new FormData(form);
+        const payload: Record<string, any> = {
+          fullname,
+          email,
+          phone: phone || undefined,
+          role,
+          message: message || undefined,
+          consent,
+          subject,
+          _hp_website: hpInput ? hpInput.value : undefined,
+          'cf-turnstile-response': turnstileToken,
+        };
+
         const response = await fetch('/api/register', {
           method: 'POST',
-          headers: { 'Accept': 'application/json' },
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(payload),
         });
 
         if (response.ok) {
           showSuccess();
         } else {
           const resData = await response.json().catch(() => ({}));
-          throw new Error(resData.error || 'Server error');
+          const errMsg = resData.error || resData.message || (response.status === 403 ? 'Security verification failed. Please try again.' : 'Server error');
+          throw new Error(errMsg);
         }
       } catch (err: any) {
         submitBtn.disabled = false;
         if (btnText) btnText.textContent = 'Send details';
+
+        // Reset Turnstile token on failure so retries do not fail with an already-used token
+        try {
+          const w = window as any;
+          if (w.turnstile && typeof w.turnstile.reset === 'function') {
+            w.turnstile.reset();
+          }
+        } catch (_) {}
+
         errBox.textContent = err.message && err.message !== 'Server error'
           ? err.message
           : 'Sorry, something went wrong sending that. Please email admin@renovatms.com.';

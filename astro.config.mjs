@@ -5,9 +5,13 @@ import cloudflare from '@astrojs/cloudflare';
 export default defineConfig({
   site: 'https://renovatms.com',
   output: 'server',
+  security: {
+    checkOrigin: false,
+  },
   adapter: cloudflare({
     platformProxy: {
       enabled: true,
     },
   }),
 });
+
