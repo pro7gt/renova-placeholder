@@ -1,0 +1,27 @@
+---
+export const prerender = true;
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import About from '../components/About.astro';
+import Principles from '../components/Principles.astro';
+import JoinTeam from '../components/JoinTeam.astro';
+import Referrers from '../components/Referrers.astro';
+import InterestForm from '../components/InterestForm.astro';
+import Privacy from '../components/Privacy.astro';
+import Footer from '../components/Footer.astro';
+---
+<BaseLayout>
+  <Header />
+  <main id="main-content">
+    <Hero />
+    <About />
+    <Principles />
+    <JoinTeam />
+    <Referrers />
+    <InterestForm />
+    <Privacy />
+  </main>
+  <Footer />
+</BaseLayout>

@@ -1,0 +1,16 @@
+# Cloudflare Pages 301 Redirects
+# Redirect cached legacy URLs to home page as per backend setup requirements
+/treatment    /  301
+/treatment/*  /  301
+/conditions   /  301
+/conditions/* /  301
+/referrers    /  301
+/referrers/*  /  301
+/contact      /  301
+/contact/*    /  301
+/about        /  301
+/about/*      /  301
+/about-us     /  301
+/team         /  301
+/services     /  301
+/services/*   /  301

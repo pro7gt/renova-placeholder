@@ -1,0 +1,220 @@
+---
+// Register Interest Form Component
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
+---
+<section class="register" id="register" aria-labelledby="form-heading">
+  <div class="wrap">
+    <div class="form-shell">
+      <div class="form-card">
+        <div class="section-head" id="formTop">
+          <h2 id="form-heading">Register your interest</h2>
+          <p class="intro">
+            Leave your details and we will be in touch as the clinic takes shape. Please do not include any personal health information in this form.
+          </p>
+        </div>
+
+        <form id="interestForm" novalidate>
+          <!-- Honeypot: hidden from real users, catches automated bots -->
+          <div class="hp" aria-hidden="true">
+            <label>Leave this field empty<input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+          </div>
+
+          <!-- Hidden subject field updated dynamically from role -->
+          <input type="hidden" name="subject" id="subjectField" value="Renova TMS interest" />
+
+          <div class="row2">
+            <div class="field">
+              <label for="fullname">Full name</label>
+              <input id="fullname" name="fullname" type="text" autocomplete="name" required aria-required="true" aria-describedby="formErr" />
+            </div>
+            <div class="field">
+              <label for="email">Email address</label>
+              <input id="email" name="email" type="email" autocomplete="email" required aria-required="true" aria-describedby="formErr" />
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="phone">Phone <span class="opt">(optional)</span></label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" />
+            </div>
+            <div class="field">
+              <label for="role">I am a</label>
+              <select id="role" name="role" required aria-required="true" aria-describedby="formErr">
+                <option value="" disabled selected>Please choose your role</option>
+                <option value="Psychiatrist">Psychiatrist</option>
+                <option value="Other clinician or allied health">Other clinician or allied health</option>
+                <option value="General practitioner or referrer">General practitioner or referrer</option>
+                <option value="Interested in treatment when you open">Interested in treatment when you open</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="message">Message <span class="opt">(optional)</span></label>
+            <textarea
+              id="message"
+              name="message"
+              maxlength="500"
+              placeholder="Optional. Please do not include personal health information."
+            ></textarea>
+          </div>
+
+          <label class="consent">
+            <input type="checkbox" id="consent" name="consent" required aria-required="true" />
+            <span>
+              I agree to Renova TMS contacting me about the clinic and handling my details in line with its <a href="#privacy">privacy statement</a>.
+            </span>
+          </label>
+
+          {turnstileSiteKey && (
+            <div class="turnstile-slot cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+          )}
+
+          <div class="err" id="formErr" role="alert" aria-live="assertive"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+              <span id="btnText">Send details</span>
+            </button>
+          </div>
+        </form>
+
+        <div class="form-success" id="formSuccess" role="status" aria-live="polite">
+          <div class="tick" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <h3>Thank you</h3>
+          <p>We have received your details and will be in touch as our plans develop.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const form = document.getElementById('interestForm') as HTMLFormElement | null;
+  const ok = document.getElementById('formSuccess') as HTMLElement | null;
+  const errBox = document.getElementById('formErr') as HTMLElement | null;
+  const roleSel = document.getElementById('role') as HTMLSelectElement | null;
+  const subjectField = document.getElementById('subjectField') as HTMLInputElement | null;
+  const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement | null;
+  const btnText = document.getElementById('btnText') as HTMLElement | null;
+
+  if (roleSel && subjectField) {
+    roleSel.addEventListener('change', () => {
+      subjectField.value = 'Renova TMS interest: ' + roleSel.value;
+      roleSel.classList.remove('is-invalid');
+      roleSel.removeAttribute('aria-invalid');
+    });
+  }
+
+  function clearInvalidStates() {
+    if (!form) return;
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach((input) => {
+      input.classList.remove('is-invalid');
+      input.removeAttribute('aria-invalid');
+    });
+  }
+
+  function markInvalid(el: HTMLElement | null) {
+    if (!el) return;
+    el.classList.add('is-invalid');
+    el.setAttribute('aria-invalid', 'true');
+    el.focus();
+  }
+
+  function showSuccess() {
+    if (form && ok) {
+      form.style.display = 'none';
+      ok.style.display = 'block';
+      const formTop = document.getElementById('formTop');
+      if (formTop) {
+        formTop.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }
+
+  if (form && errBox && submitBtn && roleSel) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.textContent = '';
+      clearInvalidStates();
+
+      const companyInput = form.querySelector('input[name="company"]') as HTMLInputElement | null;
+      if (companyInput && companyInput.value) {
+        // Honeypot triggered: simulate success to thwart bots
+        showSuccess();
+        return;
+      }
+
+      const fullnameInput = form.querySelector('input[name="fullname"]') as HTMLInputElement | null;
+      const emailInput = form.querySelector('input[name="email"]') as HTMLInputElement | null;
+      const consentInput = form.querySelector('input[name="consent"]') as HTMLInputElement | null;
+
+      const fullname = fullnameInput ? fullnameInput.value.trim() : '';
+      const email = emailInput ? emailInput.value.trim() : '';
+      const role = roleSel.value;
+      const consent = consentInput ? consentInput.checked : false;
+
+      if (!fullname) {
+        errBox.textContent = 'Please enter your full name.';
+        markInvalid(fullnameInput);
+        return;
+      }
+
+      if (!email) {
+        errBox.textContent = 'Please enter your email address.';
+        markInvalid(emailInput);
+        return;
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errBox.textContent = 'Please enter a valid email address.';
+        markInvalid(emailInput);
+        return;
+      }
+
+      if (!role) {
+        errBox.textContent = 'Please select your role from the list.';
+        markInvalid(roleSel);
+        return;
+      }
+
+      if (!consent) {
+        errBox.textContent = 'Please agree to our privacy statement to continue.';
+        markInvalid(consentInput);
+        return;
+      }
+
+      submitBtn.disabled = true;
+      if (btnText) btnText.textContent = 'Sending details...';
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' },
+          body: formData,
+        });
+
+        if (response.ok) {
+          showSuccess();
+        } else {
+          const resData = await response.json().catch(() => ({}));
+          throw new Error(resData.error || 'Server error');
+        }
+      } catch (err: any) {
+        submitBtn.disabled = false;
+        if (btnText) btnText.textContent = 'Send details';
+        errBox.textContent = err.message && err.message !== 'Server error'
+          ? err.message
+          : 'Sorry, something went wrong sending that. Please email admin@renovatms.com.';
+      }
+    });
+  }
+</script>

@@ -1,0 +1,44 @@
+---
+// Footer Component with crisis disclaimer and navigation links
+const currentYear = new Date().getFullYear();
+---
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="foot-logo" aria-label="Renova TMS"></div>
+      <p class="foot-line">Renova TMS &middot; Surrey Hills, Victoria &middot; Opening soon</p>
+      <p style="margin:0;max-width:30em;color:#9fb0c2;line-height:1.6">
+        A new targeted transcranial magnetic stimulation clinic being established in Melbourne&rsquo;s inner east, co-located alongside an established neurosurgical practice.
+      </p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="#about">About</a></li>
+        <li><a href="#principles">Clinical principles</a></li>
+        <li><a href="#join">Join the founding team</a></li>
+        <li><a href="#referrers">For referring clinicians</a></li>
+        <li><a href="#register">Register your interest</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contact &amp; Governance</h4>
+      <ul>
+        <li>Surrey Hills, Victoria 3127</li>
+        <li><a href="mailto:admin@renovatms.com">admin@renovatms.com</a></li>
+        <li><a href="#privacy">Privacy statement</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-note">
+    <div class="wrap">
+      <p class="disclaimer">
+        <strong class="disclaimer-badge">Important clinical notice:</strong> Renova TMS is a new clinic currently being established. We are not yet accepting patients or referrals, and nothing on this site constitutes medical advice. If you or someone you know needs urgent support, please contact emergency services on <strong>000</strong>, or Lifeline on <strong>13 11 14</strong>.
+      </p>
+      <div class="foot-bottom">
+        <span>&copy; {currentYear} Renova TMS. All rights reserved.</span>
+        <span>renovatms.com</span>
+      </div>
+    </div>
+  </div>
+</footer>
